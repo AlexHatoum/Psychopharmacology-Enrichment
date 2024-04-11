@@ -1,0 +1,324 @@
+#Load Necessary Packages
+library(data.table)
+
+#Load in mapped genes and Mapped SNPs from FUMA
+#We only need "Mapped" for the primary analysis. The "Cans" file of SNPs is necessary 
+#For the enrichment by other categories. 
+#Note that both of these files are standard FUMA files, so any trait run through FUMA should work
+#The only thing you need to change are the Med List in line 15, and trait in line 20
+Mapped <- fread("../../Downloads/FUMA_SCZ_Tables/Scz_Mapped_genes.txt", header=T, data.table=F)
+Cans <- fread("../../Downloads/FUMA_SCZ_Tables/Scz_Mapped_snps.txt", header=T, data.table=F)
+
+#Load coding scheme for gene-drug targets, here we use the coding scheme from Bell et al. 2022
+Genes4 <- fread("MAGMA_Gene_Drug_Mapping.txt", header=T, data.table=F)
+#Load the list of treatments coded for each disorder, here we use the copyrighted list from Stahl's perscribor guide
+MedList <- fread("MAGMA_Med_List.csv", header=T, data.table=F)
+#Combine the gene-sets and the medication list
+All <- merge(MedList, Genes4, by.x="Medication")
+
+#Note the disorder you are interested in testing for enrichment
+All$Hit <- ifelse(All$`Schizophrenia/psychosis` == 1 | All$`Schizophrenia/psychosis` == 2 | All$`Schizophrenia/psychosis adjunct`==1 | All$`Schizophrenia/psychosis adjunct`==2, 1, 0)
+
+######Organize Gene List so that it easily searchable by R, this essentially standardizes lists of 
+#characters so they fit in a single row. 
+
+Text <- NULL
+NMOA <- NULL
+clean_vec <- NULL
+for (i in 1:nrow(All)) {
+  clean_vec[i] <- gsub("\"\"", "", All[i,30])
+  Text[i] <- strsplit(clean_vec[i], ", ")
+  NMOA[i] <- length(Text[[i]])
+}
+
+#####Here, we map genes to drugs
+
+i <- 1
+v <- NULL #list of genes from MOA column
+Any <- NULL
+
+#AnyGene is the first feature, NLoc is number of genes targetted by the drug. 
+AnyGene2 <- NULL
+NLoc <- NULL
+Dirty <- NULL
+c <- NULL #List of genes from the column
+answer <- NULL
+for (i in 1:nrow(All)) {
+  
+  v <- c(Text[[i]])
+  Dirty[i] <- length(v)
+  c <- Mapped$symbol #GeneList from GWAS
+  
+  answer <- c %in% v
+  ## returns TRUE
+  Any <- sum(answer)
+  NLoc[i] <- sum(answer)
+  AnyGene2[i] <- ifelse(Any > 0, 1, 0)
+}
+
+Simple <- cbind.data.frame(AnyGene2, NLoc, Dirty)
+
+#We can use the generated data to run a logistic regression, accounting for number of genes
+mylogit <-  glm(All$Hit ~  Simple$Dirty, family = "binomial") ; summary(mylogit)
+mylogit1 <- glm(All$Hit ~ Simple$AnyGene2 + Simple$Dirty, family = "binomial") ; summary(mylogit1)
+
+
+
+#############################################################################
+
+
+########################################Scored by Effect size on Phenotype 
+
+library(stringr)
+
+v <- NULL
+c <- NULL
+Any <- NULL
+AnyGene2 <- NULL
+Mapped2 <- NULL
+Mapped3 <- NULL
+answer <- NULL
+answer2 <- NULL
+AnySNP <- NULL
+AnySNP2 <- NULL
+Mapped2 <- NULL
+Cans2 <- NULL
+String2 <- NULL
+String <- NULL
+answer3 <- NULL
+answer4 <- NULL
+for (i in 1:nrow(All)) {
+  
+  v <- c(Text[[i]])
+  c <- Mapped$symbol #GeneList from GWAS
+  
+  answer <- c %in% v
+  ## returns TRUE
+  Any <- sum(answer)
+  NLoc[i] <- sum(answer)
+  AnyGene2[i] <- ifelse(Any > 0, 1, 0)
+  
+  if (AnyGene2[i] > 0) {
+    Mapped2 <- Mapped[answer, ]
+    
+    Mapped3 <- Mapped2$IndSigSNPs #GeneList from GWAS
+    
+    String <- NULL
+    k <- NULL
+    for (k in 1:length(Mapped3)) {
+      String[k] <- str_split(Mapped3[k], ";")
+    }
+    String2 <- as.vector(unlist(String))
+    Cans2 <- Cans[Cans$rsID %in% String2, ]
+    answer2[i] <- sum(abs(Cans2$beta), na.rm=TRUE)
+    answer3[i] <- mean(Cans2$beta, na.rm=TRUE)
+    answer4[i] <- max(abs(Cans2$beta), na.rm=TRUE)
+    ## returns TRUE
+  } else {
+    answer2[i] <- sum(c(0,0))
+    answer3[i] <- sum(c(0,0))
+    answer4[i] <- sum(c(0,0))
+  }
+  ## returns the first location of 'b', in this case: 2
+}
+
+######CADD Scoring, need to get the vector "Text" from above. 
+XC <- NULL
+YC <- NULL
+vC <- NULL
+cC <- NULL
+AnyC <- NULL
+AnyGene2C <- NULL
+Mapped2C <- NULL
+Mapped3C <- NULL
+answerC <- NULL
+answer2C <- NULL
+AnySNPC <- NULL
+AnySNP2C <- NULL
+Mapped2C <- NULL
+Cans2C <- NULL
+String2C <- NULL
+StringC <- NULL
+CansC <- NULL
+MaxC <- NULL
+answer3C <- NULL
+answer4C <- NULL
+i <- 1 
+for (i in 1:nrow(All)) {
+  
+  v <- c(Text[[i]])
+  c <- Mapped$symbol #GeneList from GWAS
+  
+  answerC<- c %in% v
+  ## returns TRUE
+  AnyC <- sum(answerC)
+  NLoc[i] <- sum(answerC)
+  AnyGene2C[i] <- ifelse(AnyC > 0, 1, 0)
+  
+  if (AnyGene2C[i] > 0) {
+    Mapped2C <- Mapped[answerC, ]
+    
+    Mapped3C <- Mapped2C$IndSigSNPs #GeneList from GWAS
+    
+    StringC <- NULL
+    k <- NULL
+    for (k in 1:length(Mapped3C)) {
+      StringC[k] <- str_split(Mapped3C[k], ";")
+    }
+    String2C <- as.vector(unlist(StringC))
+    Cans2C <- Cans[Cans$IndSigSNP %in% String2C, ]
+    answer2C[i] <- sum(abs(Cans2C$CADD), na.rm=TRUE)
+    answer3C[i] <- mean(abs(Cans2C$CADD), na.rm=TRUE)
+    MaxC[i] <- Mapped2C$posMapMaxCADD
+    answer4C[i] <- max(Cans2C$CADD, na.rm=TRUE)
+    ## returns TRUE
+  } else {
+    answer2C[i] <- sum(c(0,0))
+    MaxC[i] <- sum(c(0,0))
+    answer3C[i] <- sum(c(0,0))
+    answer4C[i] <- sum(c(0,0))
+  }
+  ## returns the first location of 'b', in this case: 2
+}
+
+CADDs <- cbind.data.frame(answer2C, answer3C, MaxC, answer4C)
+
+#########Regulome Scoring
+XR <- NULL
+YR <- NULL
+vR <- NULL
+cR <- NULL
+AnyR <- NULL
+AnyGene2R <- NULL
+Mapped2R <- NULL
+Mapped3R <- NULL
+answerR <- NULL
+answer2R <- NULL
+AnySNPR <- NULL
+AnySNP2R <- NULL
+Mapped2R <- NULL
+Cans2R <- NULL
+String2R <- NULL
+StringR <- NULL
+i <- NULL
+MinR <- NULL
+for (i in 1:nrow(All)) {
+  
+  v <- c(Text[[i]])
+  c <- Mapped$symbol #GeneList from GWAS
+  
+  answerR<- c %in% v
+  ## returns TRUE
+  AnyR <- sum(answerR)
+  NLoc[i] <- sum(answerR)
+  AnyGene2R[i] <- ifelse(AnyR > 0, 1, 0)
+  
+  if (AnyGene2R[i] > 0) {
+    Mapped2R <- Mapped[answerR, ]
+    
+    Mapped3R <- Mapped2R$IndSigSNPs #GeneList from GWAS
+    
+    StringR <- NULL
+    k <- NULL
+    for (k in 1:length(Mapped3R)) {
+      StringR[k] <- str_split(Mapped3R[k], ";")
+    }
+    String2R <- as.vector(unlist(StringR))
+    Cans2R <- Cans[Cans$rsID %in% String2R, ]
+    RDBN <- NULL
+    for (j in 1:nrow(Cans2R)) {
+      RDBN[j] <-  as.numeric(gsub(".*?([0-9]+).*", "\\1", Cans2R$RDB[j]))
+    }
+    answer2R[i] <- mean(abs(RDBN), na.rm=TRUE)
+    MinR[i] <- min(RDBN, na.rm=TRUE)
+    ## returns TRUE
+  } else {
+    answer2R[i] <- sum(c(1,6))
+    MinR[i] <- sum(c(1,6))
+  }
+  ## returns the first location of 'b', in this case: 2
+}
+
+Regs <- cbind.data.frame(answer2R, MinR)
+
+#########Any Exonic Variants genes
+XF <- NULL
+YF <- NULL
+vF <- NULL
+cF <- NULL
+AnyF <- NULL
+AnyGene2F <- NULL
+Mapped2F <- NULL
+Mapped3F <- NULL
+answerF <- NULL
+answer2F <- NULL
+AnySNFF <- NULL
+AnySNF2F <- NULL
+Mapped2F <- NULL
+Cans2F <- NULL
+String2F <- NULL
+StringF <- NULL
+CansF <- NULL
+MaxF <- NULL
+answer3F <- NULL
+answer4F <- NULL
+i <- 1
+for (i in 1:nrow(All)) {
+  
+  vF <- c(Text[[i]])
+  
+  cF <- Mapped$symbol #GeneList from GWAS
+  
+  answerF <- cF %in% vF
+  ## returns TRUE
+  AnyF <- sum(answerF)
+  AnyGene2F[i] <- ifelse(AnyF > 0, 1, 0)
+  
+  Mapped2F <- Mapped[answerF, ]
+  
+  Mapped3F <- Mapped2F$IndSigSNPs #GeneList from GWAS
+  
+  StringF <- NULL
+  k <- NULL
+  for (k in 1:length(Mapped3F)) {
+    StringF[k] <- str_split(Mapped3F[k], ";")
+  }
+  String2F <- as.vector(unlist(StringF))
+  Cans2F <- Cans[Cans$rsID %in% String2F, ]
+  FunctionsString <- c(Cans2F$func)
+  AnyExon <- ifelse(FunctionsString == "exonic", 1, 0)
+  answer2F[i] <- ifelse(sum(AnyExon) > 0, 1, 0)
+  
+  ## returns the first location of 'b', in this case: 2
+}
+
+Exonic <- cbind.data.frame(answer2F)
+sum(Exonic)
+
+
+###############################################################################
+#Estimate linear models for annotation categories
+##########Linear Models
+Analysis <- cbind.data.frame(All$Mediciation, answer2, answer3, answer4, Simple, CADDs, Regs, Exonic)
+colnames(Analysis) <- c("COMNOUND", "EffectScore", "MeanEffect", "MaxEffect", "AnyGene", "GWASAndGeneNumber", "DirtyGene", "sumCADD", "MeanCADD", "MaxCaddInferred", "MaxCADDMeasured", "MeanReg", "MinReg", "Exonic")
+cor(Analysis[2:14])
+
+#########Associations
+Analysis2 <- merge(MedList, Analysis, by.x="Mediciation", by.y="COMNOUND")
+All$Hit <- ifelse(All$`Schizophrenia/psychosis` == 1 | All$`Schizophrenia/psychosis` == 2 | All$`Schizophrenia/psychosis adjunct`==1 | All$`Schizophrenia/psychosis adjunct`==2, 1, 0)
+
+mylogit <-  glm(Disease ~  DirtyGene,  data = Analysis2, family = "binomial") ; summary(mylogit)
+mylogit1 <- glm(Disease ~ AnyGene + DirtyGene,  data = Analysis2, family = "binomial") ; summary(mylogit1)
+mylogit2 <- glm(Disease ~ GWASAndGeneNumber + DirtyGene,  data = Analysis2, family = "binomial") ; summary(mylogit2)
+mylogit3 <- glm(Disease ~ sumCADD + DirtyGene,  data = Analysis2, family = "binomial") ; summary(mylogit3)
+mylogit4 <- glm(Disease ~ MeanCADD + DirtyGene,  data = Analysis2, family = "binomial") ; summary(mylogit4)
+mylogit5 <- glm(Disease ~ MaxCaddInferred + DirtyGene,  data = Analysis2, family = "binomial") ; summary(mylogit5)
+mylogit6 <- glm(Disease ~ MaxCADDMeasured + DirtyGene,  data = Analysis2, family = "binomial") ; summary(mylogit6)
+mylogit7 <- glm(Disease ~ MeanReg + DirtyGene,  data = Analysis2, family = "binomial") ; summary(mylogit7)
+mylogit8 <- glm(Disease ~ MinReg + DirtyGene,  data = Analysis2, family = "binomial") ; summary(mylogit8)
+mylogit9 <- glm(Disease ~ EffectScore + DirtyGene,  data = Analysis2, family = "binomial") ; summary(mylogit9)
+mylogit10 <- glm(Disease ~ MeanEffect + DirtyGene,  data = Analysis2, family = "binomial") ; summary(mylogit10)
+mylogit11 <- glm(Disease ~ MaxEffect + DirtyGene,  data = Analysis2, family = "binomial") ; summary(mylogit11)
+mylogit12 <- glm(Disease ~ Exonic + DirtyGene,  data = Analysis2, family = "binomial") ; summary(mylogit12)
+
+
