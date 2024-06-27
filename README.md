@@ -6,3 +6,5 @@ run with "SNP2Gene" in FUMA, you can download the results for gene table and SNP
 In order to run the script, you will only need to change lines 9 (gene table), 10(SNP table), 13 (Gene-drug), and 15 (drug-indication) to accommodate your files. There are additional annotations throughout the R file to help with intepretation of the code. You may also need to change line 21, depending on your coding scheme, and 29, depending on the size of your file. On line 29, [i,30] needs to be a column of gene-symbols for the script to run, i.e. in my example "30" is the column number in my table of gene-symbols, make sure that "30" is column number for your gene-symbols in your gene-table from FUMA. All analyses were run using the same script and changing lines 9, 10, and 29 to accomadate different phenotypes. 
 
 All code was tested on R version 4.2.0 with data.table version 1.14.10. 
+
+Licensed under the Academic Free License version 3.0
