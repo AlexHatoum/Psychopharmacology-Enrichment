@@ -8,3 +8,6 @@ All code was tested on R version 4.2.0 with data.table version 1.14.10.
 Licensed under the Academic Free License version 3.0
 
 We also make several files are available that contain all the necessary information to run those annotations for the psychiatric disorders included in the manuscript (here: https://wustl.box.com/s/c94gup91y63r30zonr1rt4dhvs6wj4e9)
+
+P.S.
+Please forgive the hardcoding. Much of had to be written simply so a reviewer could follow with less difficulty. The script benchmarks at nearly an identical speed. 
